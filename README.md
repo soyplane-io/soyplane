@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/readme-thumbnail-300px.png" width="200" alt="Soyplane Mascot" />
+  <img src="assets/mascot.png" width="500" alt="Soyplane Mascot" />
 </p>
 
 # Soyplane
