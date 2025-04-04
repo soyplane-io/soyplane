@@ -2,11 +2,8 @@
   <img src="assets/mascot.png" width="500" alt="Soyplane Mascot" />
 </p>
 
-# Soyplane
-
-🚀 A friendly, OpenTofu-compatible Terraform operator for Kubernetes with native GitOps and Argo CD integration.
-
-**Plan, apply, and detect drift — declaratively.**
+<h1 align="center">Soyplane</h1>
+<p align="center"><i>A Terraform operator for Kubernetes — powered by OpenTofu and GitOps-native.</i></p>
 
 ---
 
