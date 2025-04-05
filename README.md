@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs:logo/readme-thumbnail.png" width="300" /><br/>
+  <img src="docs/pictures/readme-thumbnail.png" width="300" /><br/>
 </p>
 
 🚀 A friendly, OpenTofu-compatible Terraform operator for Kubernetes with native GitOps and Argo CD integration.
