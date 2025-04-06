@@ -1,0 +1,85 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: tofuproviders.opentofu.soyplane.io
+spec:
+  group: opentofu.soyplane.io
+  names:
+    kind: TofuProvider
+    listKind: TofuProviderList
+    plural: tofuproviders
+    singular: tofuprovider
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: TofuProvider is the Schema for the tofuproviders API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: TofuProviderSpec defines the desired state of TofuProvider.
+            properties:
+              config:
+                additionalProperties:
+                  x-kubernetes-preserve-unknown-fields: true
+                type: object
+              rawConfig:
+                type: string
+              type:
+                type: string
+              valueSources:
+                additionalProperties:
+                  properties:
+                    configMapRef:
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                      required:
+                      - key
+                      - name
+                      type: object
+                    secretRef:
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                      required:
+                      - key
+                      - name
+                      type: object
+                  type: object
+                type: object
+            required:
+            - type
+            type: object
+          status:
+            description: TofuProviderStatus defines the observed state of TofuProvider.
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,8 +29,25 @@ type TofuProviderSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of TofuProvider. Edit tofuprovider_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Type         string                          `json:"type"`
+	ValueSources map[string]ValueSource          `json:"valueSources,omitempty"`
+	RawConfig    string                          `json:"rawConfig,omitempty"`
+	Config       map[string]apiextensionsv1.JSON `json:"config,omitempty"` // templated YAML
+}
+
+type ValueSource struct {
+	SecretRef    *SecretKeyRef    `json:"secretRef,omitempty"`
+	ConfigMapRef *ConfigMapKeyRef `json:"configMapRef,omitempty"`
+}
+
+type SecretKeyRef struct {
+	Name string `json:"name"`
+	Key  string `json:"key"`
+}
+
+type ConfigMapKeyRef struct {
+	Name string `json:"name"`
+	Key  string `json:"key"`
 }
 
 // TofuProviderStatus defines the observed state of TofuProvider.
