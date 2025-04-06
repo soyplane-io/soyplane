@@ -5,6 +5,7 @@
 domain: soyplane.io
 layout:
 - go.kubebuilder.io/v4
+multigroup: true
 projectName: soyplane
 repo: github.com/soyplane-io/soyplane
 version: "3"
