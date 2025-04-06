@@ -1,0 +1,9 @@
+apiVersion: opentofu.soyplane.io/v1alpha1
+kind: TofuProvider
+metadata:
+  labels:
+    app.kubernetes.io/name: soyplane
+    app.kubernetes.io/managed-by: kustomize
+  name: tofuprovider-sample
+spec:
+  # TODO(user): Add fields here
