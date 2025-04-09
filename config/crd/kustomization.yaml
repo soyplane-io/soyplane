@@ -4,6 +4,7 @@
 resources:
 - bases/opentofu.soyplane.io_tofuproviders.yaml
 - bases/opentofu.soyplane.io_tofumodules.yaml
+- bases/opentofu.soyplane.io_tofuexecutions.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

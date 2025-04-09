@@ -2,4 +2,5 @@
 resources:
 - opentofu_v1alpha1_tofuprovider.yaml
 - opentofu_v1alpha1_tofumodule.yaml
+- opentofu_v1alpha1_tofuexecution.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

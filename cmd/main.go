@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	opentofuv1alpha1 "github.com/soyplane-io/soyplane/api/opentofu/v1alpha1"
+	opentofucontroller "github.com/soyplane-io/soyplane/internal/controller/opentofu"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -201,6 +202,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&opentofucontroller.TofuExecutionReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "TofuExecution")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if metricsCertWatcher != nil {

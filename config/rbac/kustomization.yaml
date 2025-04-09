@@ -22,6 +22,9 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the {{ .ProjectName }} itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- opentofu_tofuexecution_admin_role.yaml
+- opentofu_tofuexecution_editor_role.yaml
+- opentofu_tofuexecution_viewer_role.yaml
 - opentofu_tofumodule_admin_role.yaml
 - opentofu_tofumodule_editor_role.yaml
 - opentofu_tofumodule_viewer_role.yaml
