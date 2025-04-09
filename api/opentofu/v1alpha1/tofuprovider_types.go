@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,10 +29,10 @@ type TofuProviderSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Type         string                          `json:"type"`
-	ValueSources map[string]ValueSource          `json:"valueSources,omitempty"`
-	RawConfig    string                          `json:"rawConfig,omitempty"`
-	Config       map[string]apiextensionsv1.JSON `json:"config,omitempty"` // templated YAML
+	Type         string                   `json:"type"`
+	ValueSources map[string]ValueSource   `json:"valueSources,omitempty"`
+	RawConfig    string                   `json:"rawConfig,omitempty"`
+	Config       map[string]apiextv1.JSON `json:"config,omitempty"` // templated YAML
 }
 
 type ValueSource struct {

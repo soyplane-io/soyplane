@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/opentofu.soyplane.io_tofuproviders.yaml
+- bases/opentofu.soyplane.io_tofumodules.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

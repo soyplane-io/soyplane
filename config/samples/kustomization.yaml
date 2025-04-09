@@ -1,4 +1,5 @@
 ## Append samples of your project ##
 resources:
 - opentofu_v1alpha1_tofuprovider.yaml
+- opentofu_v1alpha1_tofumodule.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
