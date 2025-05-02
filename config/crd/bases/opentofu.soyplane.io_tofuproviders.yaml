@@ -11,10 +11,19 @@ spec:
     kind: TofuProvider
     listKind: TofuProviderList
     plural: tofuproviders
+    shortNames:
+    - tfprov
     singular: tofuprovider
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.type
+      name: Type
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: TofuProvider is the Schema for the tofuproviders API.
@@ -37,15 +46,20 @@ spec:
           metadata:
             type: object
           spec:
-            description: TofuProviderSpec defines the desired state of TofuProvider.
+            description: TofuProviderSpec defines the configuration for a Terraform/OpenTofu
+              provider block.
             properties:
               config:
                 additionalProperties:
                   x-kubernetes-preserve-unknown-fields: true
+                description: Config is a templated YAML configuration parsed into
+                  structured JSON.
                 type: object
               rawConfig:
+                description: RawConfig is a raw HCL/YAML block (stringified).
                 type: string
               type:
+                description: Type is the name of the provider (e.g., "aws", "google").
                 type: string
               valueSources:
                 additionalProperties:
@@ -53,30 +67,38 @@ spec:
                     configMapRef:
                       properties:
                         key:
+                          description: Key is the specific key within the ConfigMap.
                           type: string
                         name:
+                          description: ConfigMapKeyRef identifies a key within a ConfigMap.
                           type: string
                       required:
                       - key
                       - name
                       type: object
                     secretRef:
+                      description: ValueSource represents where to pull a single value
+                        from (secret or config map).
                       properties:
                         key:
+                          description: Key is the specific key within the Secret.
                           type: string
                         name:
+                          description: SecretKeyRef identifies a key within a Kubernetes
+                            Secret.
                           type: string
                       required:
                       - key
                       - name
                       type: object
                   type: object
+                description: ValueSources maps variables to secrets or config maps.
                 type: object
             required:
             - type
             type: object
           status:
-            description: TofuProviderStatus defines the observed state of TofuProvider.
+            description: TofuProviderStatus holds observed state (currently unused).
             type: object
         type: object
     served: true

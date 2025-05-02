@@ -8,6 +8,7 @@ rules:
   - opentofu.soyplane.io
   resources:
   - tofuexecutions
+  - tofustacks
   verbs:
   - create
   - delete
@@ -20,12 +21,14 @@ rules:
   - opentofu.soyplane.io
   resources:
   - tofuexecutions/finalizers
+  - tofustacks/finalizers
   verbs:
   - update
 - apiGroups:
   - opentofu.soyplane.io
   resources:
   - tofuexecutions/status
+  - tofustacks/status
   verbs:
   - get
   - patch

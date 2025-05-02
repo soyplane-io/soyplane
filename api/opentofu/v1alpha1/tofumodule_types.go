@@ -21,9 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
+// BackendSpec defines the backend configuration for state storage of a module.
 type BackendSpec struct {
 	Type         string                   `json:"type"`
 	RawConfig    string                   `json:"rawConfig,omitempty"`
@@ -31,34 +29,40 @@ type BackendSpec struct {
 	ValueSources map[string]ValueFrom     `json:"valueSources,omitempty"`
 }
 
+// TofuProviderRef contains a reference to a Tofu provider.
 type TofuProviderRef struct {
 	Name  string `json:"name"`
 	Alias string `json:"alias,omitempty"`
 }
 
+// KeyRef contains a reference to a key in a secret or config map.
 type KeyRef struct {
 	Name string `json:"name"`
 	Key  string `json:"key"`
 }
 
+// ValueFrom defines how to retrieve values from external sources.
 type ValueFrom struct {
 	SecretRef    *KeyRef `json:"secretRef,omitempty"`
 	ConfigMapRef *KeyRef `json:"configMapRef,omitempty"`
 }
 
+// OutputSpec defines the output configuration for a module.
 type OutputSpec struct {
 	From string         `json:"from"`
 	To   []OutputTarget `json:"to"`
 }
 
+// OutputTarget defines the target for the output of a module.
 type OutputTarget struct {
 	// +kubebuilder:validation:Enum=Secret;ConfigMap
+	// Kind indicates the type of output target object.
 	Kind string `json:"kind"`
 	Name string `json:"name"`
 	Key  string `json:"key"`
 }
 
-// TofuModuleSpec defines the desired state of TofuModule.
+// TofuModuleSpec defines the desired state of a TofuModule resource.
 type TofuModuleSpec struct {
 	Source       string                   `json:"source"`
 	Version      string                   `json:"version,omitempty"`
@@ -69,7 +73,7 @@ type TofuModuleSpec struct {
 	Outputs      []OutputSpec             `json:"outputs,omitempty"`
 }
 
-// TofuModuleStatus defines the observed state of TofuModule.
+// TofuModuleStatus defines the observed state of a TofuModule.
 type TofuModuleStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
@@ -77,6 +81,10 @@ type TofuModuleStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=tfmod
+// +kubebuilder:printcolumn:name="Source",type=string,JSONPath=`.spec.source`
+// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=`.spec.version`
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // TofuModule is the Schema for the tofumodules API.
 type TofuModule struct {

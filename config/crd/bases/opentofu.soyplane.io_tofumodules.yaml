@@ -11,10 +11,22 @@ spec:
     kind: TofuModule
     listKind: TofuModuleList
     plural: tofumodules
+    shortNames:
+    - tfmod
     singular: tofumodule
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.source
+      name: Source
+      type: string
+    - jsonPath: .spec.version
+      name: Version
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: TofuModule is the Schema for the tofumodules API.
@@ -37,9 +49,12 @@ spec:
           metadata:
             type: object
           spec:
-            description: TofuModuleSpec defines the desired state of TofuModule.
+            description: TofuModuleSpec defines the desired state of a TofuModule
+              resource.
             properties:
               backend:
+                description: BackendSpec defines the backend configuration for state
+                  storage of a module.
                 properties:
                   config:
                     additionalProperties:
@@ -51,8 +66,12 @@ spec:
                     type: string
                   valueSources:
                     additionalProperties:
+                      description: ValueFrom defines how to retrieve values from external
+                        sources.
                       properties:
                         configMapRef:
+                          description: KeyRef contains a reference to a key in a secret
+                            or config map.
                           properties:
                             key:
                               type: string
@@ -63,6 +82,8 @@ spec:
                           - name
                           type: object
                         secretRef:
+                          description: KeyRef contains a reference to a key in a secret
+                            or config map.
                           properties:
                             key:
                               type: string
@@ -79,15 +100,20 @@ spec:
                 type: object
               outputs:
                 items:
+                  description: OutputSpec defines the output configuration for a module.
                   properties:
                     from:
                       type: string
                     to:
                       items:
+                        description: OutputTarget defines the target for the output
+                          of a module.
                         properties:
                           key:
                             type: string
                           kind:
+                            description: Kind indicates the type of output target
+                              object.
                             enum:
                             - Secret
                             - ConfigMap
@@ -107,6 +133,7 @@ spec:
                 type: array
               providers:
                 items:
+                  description: TofuProviderRef contains a reference to a Tofu provider.
                   properties:
                     alias:
                       type: string
@@ -120,8 +147,12 @@ spec:
                 type: string
               valueSources:
                 additionalProperties:
+                  description: ValueFrom defines how to retrieve values from external
+                    sources.
                   properties:
                     configMapRef:
+                      description: KeyRef contains a reference to a key in a secret
+                        or config map.
                       properties:
                         key:
                           type: string
@@ -132,6 +163,8 @@ spec:
                       - name
                       type: object
                     secretRef:
+                      description: KeyRef contains a reference to a key in a secret
+                        or config map.
                       properties:
                         key:
                           type: string
@@ -154,7 +187,7 @@ spec:
             - source
             type: object
           status:
-            description: TofuModuleStatus defines the observed state of TofuModule.
+            description: TofuModuleStatus defines the observed state of a TofuModule.
             type: object
         type: object
     served: true

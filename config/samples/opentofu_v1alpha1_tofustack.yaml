@@ -1,0 +1,28 @@
+apiVersion: opentofu.soyplane.io/v1alpha1
+kind: TofuStack
+metadata:
+  labels:
+    app.kubernetes.io/name: soyplane
+    app.kubernetes.io/managed-by: kustomize
+  name: tofustack-sample
+spec:
+  moduleTemplate:
+    name: dummy
+    namespace: default
+  executionTemplate:
+    metadata:
+      labels:
+        purpose: demo
+    spec:
+      action: plan
+      moduleRef:
+        name: dummy
+        namespace: default
+      jobTemplate:
+        metadata:
+          labels:
+            test: test1
+        env:
+          - name: TF_LOG
+            value: DEBUG
+  autoApply: false

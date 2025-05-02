@@ -21,36 +21,39 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// TofuProviderSpec defines the desired state of TofuProvider.
+// TofuProviderSpec defines the configuration for a Terraform/OpenTofu provider block.
 type TofuProviderSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	Type         string                   `json:"type"`
-	ValueSources map[string]ValueSource   `json:"valueSources,omitempty"`
-	RawConfig    string                   `json:"rawConfig,omitempty"`
-	Config       map[string]apiextv1.JSON `json:"config,omitempty"` // templated YAML
+	// Type is the name of the provider (e.g., "aws", "google").
+	Type string `json:"type"`
+	// ValueSources maps variables to secrets or config maps.
+	ValueSources map[string]ValueSource `json:"valueSources,omitempty"`
+	// RawConfig is a raw HCL/YAML block (stringified).
+	RawConfig string `json:"rawConfig,omitempty"`
+	// Config is a templated YAML configuration parsed into structured JSON.
+	Config map[string]apiextv1.JSON `json:"config,omitempty"` // templated YAML
 }
 
 type ValueSource struct {
+	// ValueSource represents where to pull a single value from (secret or config map).
 	SecretRef    *SecretKeyRef    `json:"secretRef,omitempty"`
 	ConfigMapRef *ConfigMapKeyRef `json:"configMapRef,omitempty"`
 }
 
 type SecretKeyRef struct {
+	// SecretKeyRef identifies a key within a Kubernetes Secret.
 	Name string `json:"name"`
-	Key  string `json:"key"`
+	// Key is the specific key within the Secret.
+	Key string `json:"key"`
 }
 
 type ConfigMapKeyRef struct {
+	// ConfigMapKeyRef identifies a key within a ConfigMap.
 	Name string `json:"name"`
-	Key  string `json:"key"`
+	// Key is the specific key within the ConfigMap.
+	Key string `json:"key"`
 }
 
-// TofuProviderStatus defines the observed state of TofuProvider.
+// TofuProviderStatus holds observed state (currently unused).
 type TofuProviderStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
@@ -58,6 +61,9 @@ type TofuProviderStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=tfprov
+// +kubebuilder:printcolumn:name="Type",type=string,JSONPath=`.spec.type`
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // TofuProvider is the Schema for the tofuproviders API.
 type TofuProvider struct {

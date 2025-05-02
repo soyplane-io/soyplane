@@ -1,6 +1,13 @@
 {
   "name": "Kubebuilder DevContainer",
   "image": "docker.io/golang:1.23",
+  "mounts": [
+    "source=${env:HOME}/.kube,target=${env:HOME}/.kube,type=bind",
+    "source=${env:HOME}/.minikube,target=${env:HOME}/.minikube,type=bind"
+  ],
+  "remoteEnv": {
+    "KUBECONFIG": "/Users/othmaneelwarrak/.kube/config"
+  },
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/git:1": {}

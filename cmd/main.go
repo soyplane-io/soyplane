@@ -209,6 +209,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "TofuExecution")
 		os.Exit(1)
 	}
+	if err = (&opentofucontroller.TofuStackReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "TofuStack")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if metricsCertWatcher != nil {
