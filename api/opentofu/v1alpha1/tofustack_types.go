@@ -20,20 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ExecutionTemplateSpec defines the metadata and spec for TofuExecutions triggered by this stack.
-type ExecutionTemplateSpec struct {
-	// Metadata defines labels, annotations, and name generation for the execution.
-	Metadata ObjectMetadata `json:"metadata,omitempty"`
-	// Spec defines the TofuExecution runtime configuration.
-	Spec TofuExecutionSpec `json:"spec"` // Specification of the execution.
-}
-
-// DriftDetectionSpec configures drift detection settings for a TofuStack.
-type DriftDetectionSpec struct {
-	Enabled  bool            `json:"enabled"`            // Enables or disables drift detection.
-	Interval metav1.Duration `json:"interval,omitempty"` // Interval between drift checks (e.g., "30m").
-}
-
 // TofuStackSpec defines the desired state of a TofuStack.
 type TofuStackSpec struct {
 	ModuleRef         ObjectRef             `json:"moduleTemplate"`           // Reference to a TofuModule.

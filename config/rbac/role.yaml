@@ -8,6 +8,7 @@ rules:
   - opentofu.soyplane.io
   resources:
   - tofuexecutions
+  - tofumodules
   - tofustacks
   verbs:
   - create
@@ -21,6 +22,7 @@ rules:
   - opentofu.soyplane.io
   resources:
   - tofuexecutions/finalizers
+  - tofumodules/finalizers
   - tofustacks/finalizers
   verbs:
   - update
@@ -28,6 +30,7 @@ rules:
   - opentofu.soyplane.io
   resources:
   - tofuexecutions/status
+  - tofumodules/status
   - tofustacks/status
   verbs:
   - get

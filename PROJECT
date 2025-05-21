@@ -20,6 +20,7 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
+  controller: true
   domain: soyplane.io
   group: opentofu
   kind: TofuModule

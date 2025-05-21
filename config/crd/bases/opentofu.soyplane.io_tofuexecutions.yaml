@@ -63,11 +63,11 @@ spec:
                   it's version.
                 properties:
                   name:
-                    default: opentofu
-                    description: 'Engine type: "opentofu" (OpenTofu) or "terraform"
-                      (HashiCorp Terraform)'
+                    default: tofu
+                    description: 'Engine type: "tofu" (OpenTofu) or "terraform" (HashiCorp
+                      Terraform)'
                     enum:
-                    - opentofu
+                    - tofu
                     - terraform
                     type: string
                   version:
@@ -199,6 +199,51 @@ spec:
                           type: object
                       required:
                       - name
+                      type: object
+                    type: array
+                  envFrom:
+                    items:
+                      description: EnvFromSource represents the source of a set of
+                        ConfigMaps
+                      properties:
+                        configMapRef:
+                          description: The ConfigMap to select from
+                          properties:
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            optional:
+                              description: Specify whether the ConfigMap must be defined
+                              type: boolean
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        prefix:
+                          description: An optional identifier to prepend to each key
+                            in the ConfigMap. Must be a C_IDENTIFIER.
+                          type: string
+                        secretRef:
+                          description: The Secret to select from
+                          properties:
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            optional:
+                              description: Specify whether the Secret must be defined
+                              type: boolean
+                          type: object
+                          x-kubernetes-map-type: atomic
                       type: object
                     type: array
                   metadata:

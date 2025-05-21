@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
@@ -39,6 +40,7 @@ import (
 
 	opentofuv1alpha1 "github.com/soyplane-io/soyplane/api/opentofu/v1alpha1"
 	opentofucontroller "github.com/soyplane-io/soyplane/internal/controller/opentofu"
+	settings "github.com/soyplane-io/soyplane/internal/settings"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -202,6 +204,25 @@ func main() {
 		os.Exit(1)
 	}
 
+	podNamespace := os.Getenv("POD_NAMESPACE")
+	if podNamespace == "" {
+		setupLog.Error(nil, "POD_NAMESPACE environment variable not set")
+		os.Exit(1)
+	}
+	settingsWatcher := settings.SettingsWatcher{
+		Client:    mgr.GetClient(),
+		Namespace: podNamespace,
+	}
+
+	if err = settingsWatcher.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SettingsWatcher")
+		os.Exit(1)
+	}
+	reader := mgr.GetAPIReader()
+	if err := settingsWatcher.Load(context.Background(), &reader); err != nil {
+		setupLog.Error(err, "failed to load initial settings")
+		os.Exit(1)
+	}
 	if err = (&opentofucontroller.TofuExecutionReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -214,6 +235,13 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "TofuStack")
+		os.Exit(1)
+	}
+	if err = (&opentofucontroller.TofuModuleReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "TofuModule")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

@@ -32,15 +32,16 @@ type JobTemplateSpec struct {
 	// Metadata defines labels, annotations, and name generation for the job.
 	Metadata ObjectMetadata `json:"metadata"`
 	// Env specifies environment variables to inject into the container.
-	Env []corev1.EnvVar `json:"env,omitempty"`
+	Env     []corev1.EnvVar        `json:"env,omitempty"`
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 	// ServiceAccountName is the name of the service account to run the job under.
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 type EngineSpec struct {
-	// +kubebuilder:validation:Enum=opentofu;terraform
-	// Engine type: "opentofu" (OpenTofu) or "terraform" (HashiCorp Terraform)
-	// +kubebuilder:default=opentofu
+	// +kubebuilder:validation:Enum=tofu;terraform
+	// Engine type: "tofu" (OpenTofu) or "terraform" (HashiCorp Terraform)
+	// +kubebuilder:default=tofu
 	Name string `json:"name,omitempty"`
 
 	// Optional: specific image tag or version to use, e.g. "v1.6.2"

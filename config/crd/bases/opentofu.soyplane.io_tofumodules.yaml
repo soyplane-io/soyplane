@@ -23,6 +23,12 @@ spec:
     - jsonPath: .spec.version
       name: Version
       type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.lastExecution
+      name: LastExecution
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -52,6 +58,8 @@ spec:
             description: TofuModuleSpec defines the desired state of a TofuModule
               resource.
             properties:
+              autoApply:
+                type: boolean
               backend:
                 description: BackendSpec defines the backend configuration for state
                   storage of a module.
@@ -97,6 +105,288 @@ spec:
                     type: object
                 required:
                 - type
+                type: object
+              driftDetection:
+                description: DriftDetectionSpec configures drift detection settings
+                  for a TofuStack.
+                properties:
+                  enabled:
+                    type: boolean
+                  interval:
+                    type: string
+                required:
+                - enabled
+                type: object
+              executionTemplate:
+                description: ExecutionTemplateSpec defines the metadata and spec for
+                  TofuExecutions triggered by this stack.
+                properties:
+                  metadata:
+                    description: Metadata defines labels, annotations, and name generation
+                      for the execution.
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: Annotations provide additional metadata for the
+                          object.
+                        type: object
+                      generateName:
+                        description: GenerateName is used to auto-generate a unique
+                          object name with the specified prefix.
+                        type: string
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: Labels are key-value pairs attached to the object.
+                        type: object
+                    type: object
+                  spec:
+                    description: Spec defines the TofuExecution runtime configuration.
+                    properties:
+                      action:
+                        description: 'Action specifies the execution type: "plan"
+                          or "apply".'
+                        enum:
+                        - plan
+                        - apply
+                        type: string
+                      engine:
+                        description: Engine specifies the engine (OpenTofu, Terraform)
+                          and it's version.
+                        properties:
+                          name:
+                            default: tofu
+                            description: 'Engine type: "tofu" (OpenTofu) or "terraform"
+                              (HashiCorp Terraform)'
+                            enum:
+                            - tofu
+                            - terraform
+                            type: string
+                          version:
+                            default: latest
+                            description: 'Optional: specific image tag or version
+                              to use, e.g. "v1.6.2"'
+                            type: string
+                        type: object
+                      jobTemplate:
+                        description: JobTemplate optionally overrides the default
+                          job used to run the execution.
+                        properties:
+                          env:
+                            description: Env specifies environment variables to inject
+                              into the container.
+                            items:
+                              description: EnvVar represents an environment variable
+                                present in a Container.
+                              properties:
+                                name:
+                                  description: Name of the environment variable. Must
+                                    be a C_IDENTIFIER.
+                                  type: string
+                                value:
+                                  description: |-
+                                    Variable references $(VAR_NAME) are expanded
+                                    using the previously defined environment variables in the container and
+                                    any service environment variables. If a variable cannot be resolved,
+                                    the reference in the input string will be unchanged. Double $$ are reduced
+                                    to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                                    "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                                    Escaped references will never be expanded, regardless of whether the variable
+                                    exists or not.
+                                    Defaults to "".
+                                  type: string
+                                valueFrom:
+                                  description: Source for the environment variable's
+                                    value. Cannot be used if value is not empty.
+                                  properties:
+                                    configMapKeyRef:
+                                      description: Selects a key of a ConfigMap.
+                                      properties:
+                                        key:
+                                          description: The key to select.
+                                          type: string
+                                        name:
+                                          default: ""
+                                          description: |-
+                                            Name of the referent.
+                                            This field is effectively required, but due to backwards compatibility is
+                                            allowed to be empty. Instances of this type with an empty value here are
+                                            almost certainly wrong.
+                                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                          type: string
+                                        optional:
+                                          description: Specify whether the ConfigMap
+                                            or its key must be defined
+                                          type: boolean
+                                      required:
+                                      - key
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                    fieldRef:
+                                      description: |-
+                                        Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                                        spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+                                      properties:
+                                        apiVersion:
+                                          description: Version of the schema the FieldPath
+                                            is written in terms of, defaults to "v1".
+                                          type: string
+                                        fieldPath:
+                                          description: Path of the field to select
+                                            in the specified API version.
+                                          type: string
+                                      required:
+                                      - fieldPath
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                    resourceFieldRef:
+                                      description: |-
+                                        Selects a resource of the container: only resources limits and requests
+                                        (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+                                      properties:
+                                        containerName:
+                                          description: 'Container name: required for
+                                            volumes, optional for env vars'
+                                          type: string
+                                        divisor:
+                                          anyOf:
+                                          - type: integer
+                                          - type: string
+                                          description: Specifies the output format
+                                            of the exposed resources, defaults to
+                                            "1"
+                                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                          x-kubernetes-int-or-string: true
+                                        resource:
+                                          description: 'Required: resource to select'
+                                          type: string
+                                      required:
+                                      - resource
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                    secretKeyRef:
+                                      description: Selects a key of a secret in the
+                                        pod's namespace
+                                      properties:
+                                        key:
+                                          description: The key of the secret to select
+                                            from.  Must be a valid secret key.
+                                          type: string
+                                        name:
+                                          default: ""
+                                          description: |-
+                                            Name of the referent.
+                                            This field is effectively required, but due to backwards compatibility is
+                                            allowed to be empty. Instances of this type with an empty value here are
+                                            almost certainly wrong.
+                                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                          type: string
+                                        optional:
+                                          description: Specify whether the Secret
+                                            or its key must be defined
+                                          type: boolean
+                                      required:
+                                      - key
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                  type: object
+                              required:
+                              - name
+                              type: object
+                            type: array
+                          envFrom:
+                            items:
+                              description: EnvFromSource represents the source of
+                                a set of ConfigMaps
+                              properties:
+                                configMapRef:
+                                  description: The ConfigMap to select from
+                                  properties:
+                                    name:
+                                      default: ""
+                                      description: |-
+                                        Name of the referent.
+                                        This field is effectively required, but due to backwards compatibility is
+                                        allowed to be empty. Instances of this type with an empty value here are
+                                        almost certainly wrong.
+                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                      type: string
+                                    optional:
+                                      description: Specify whether the ConfigMap must
+                                        be defined
+                                      type: boolean
+                                  type: object
+                                  x-kubernetes-map-type: atomic
+                                prefix:
+                                  description: An optional identifier to prepend to
+                                    each key in the ConfigMap. Must be a C_IDENTIFIER.
+                                  type: string
+                                secretRef:
+                                  description: The Secret to select from
+                                  properties:
+                                    name:
+                                      default: ""
+                                      description: |-
+                                        Name of the referent.
+                                        This field is effectively required, but due to backwards compatibility is
+                                        allowed to be empty. Instances of this type with an empty value here are
+                                        almost certainly wrong.
+                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                      type: string
+                                    optional:
+                                      description: Specify whether the Secret must
+                                        be defined
+                                      type: boolean
+                                  type: object
+                                  x-kubernetes-map-type: atomic
+                              type: object
+                            type: array
+                          metadata:
+                            description: Metadata defines labels, annotations, and
+                              name generation for the job.
+                            properties:
+                              annotations:
+                                additionalProperties:
+                                  type: string
+                                description: Annotations provide additional metadata
+                                  for the object.
+                                type: object
+                              generateName:
+                                description: GenerateName is used to auto-generate
+                                  a unique object name with the specified prefix.
+                                type: string
+                              labels:
+                                additionalProperties:
+                                  type: string
+                                description: Labels are key-value pairs attached to
+                                  the object.
+                                type: object
+                            type: object
+                          serviceAccountName:
+                            description: ServiceAccountName is the name of the service
+                              account to run the job under.
+                            type: string
+                        required:
+                        - metadata
+                        type: object
+                      moduleRef:
+                        description: ModuleRef references the TofuModule to be executed.
+                        properties:
+                          name:
+                            type: string
+                          namespace:
+                            type: string
+                        required:
+                        - name
+                        - namespace
+                        type: object
+                    required:
+                    - action
+                    - moduleRef
+                    type: object
+                required:
+                - spec
                 type: object
               outputs:
                 items:
@@ -182,12 +472,118 @@ spec:
                 type: object
               version:
                 type: string
+              workdir:
+                type: string
             required:
-            - backend
             - source
             type: object
           status:
             description: TofuModuleStatus defines the observed state of a TofuModule.
+            properties:
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastApply:
+                description: ExecutionSummary captures metadata about a specific execution
+                  of a module.
+                properties:
+                  finishedAt:
+                    format: date-time
+                    type: string
+                  jobName:
+                    type: string
+                  revision:
+                    type: string
+                  startedAt:
+                    format: date-time
+                    type: string
+                  summary:
+                    type: string
+                  triggeredBy:
+                    type: string
+                type: object
+              lastExecution:
+                type: string
+              lastPlan:
+                description: ExecutionSummary captures metadata about a specific execution
+                  of a module.
+                properties:
+                  finishedAt:
+                    format: date-time
+                    type: string
+                  jobName:
+                    type: string
+                  revision:
+                    type: string
+                  startedAt:
+                    format: date-time
+                    type: string
+                  summary:
+                    type: string
+                  triggeredBy:
+                    type: string
+                type: object
+              observedGeneration:
+                format: int64
+                type: integer
+              phase:
+                description: |-
+                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                type: string
             type: object
         type: object
     served: true

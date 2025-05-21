@@ -62,21 +62,45 @@ type OutputTarget struct {
 	Key  string `json:"key"`
 }
 
+// ExecutionTemplateSpec defines the metadata and spec for TofuExecutions triggered by this stack.
+type ExecutionTemplateSpec struct {
+	// Metadata defines labels, annotations, and name generation for the execution.
+	Metadata ObjectMetadata `json:"metadata,omitempty"`
+	// Spec defines the TofuExecution runtime configuration.
+	Spec TofuExecutionSpec `json:"spec"` // Specification of the execution.
+}
+
+// DriftDetectionSpec configures drift detection settings for a TofuStack.
+type DriftDetectionSpec struct {
+	Enabled  bool            `json:"enabled"`            // Enables or disables drift detection.
+	Interval metav1.Duration `json:"interval,omitempty"` // Interval between drift checks (e.g., "30m").
+}
+
 // TofuModuleSpec defines the desired state of a TofuModule resource.
 type TofuModuleSpec struct {
-	Source       string                   `json:"source"`
-	Version      string                   `json:"version,omitempty"`
-	Backend      BackendSpec              `json:"backend"`
-	Providers    []TofuProviderRef        `json:"providers,omitempty"`
-	Variables    map[string]apiextv1.JSON `json:"variables,omitempty"`
-	ValueSources map[string]ValueFrom     `json:"valueSources,omitempty"`
-	Outputs      []OutputSpec             `json:"outputs,omitempty"`
+	Source            string                   `json:"source"`
+	Version           string                   `json:"version,omitempty"`
+	Workdir           string                   `json:"workdir,omitempty"`
+	Backend           BackendSpec              `json:"backend,omitempty"`
+	Providers         []TofuProviderRef        `json:"providers,omitempty"`
+	Variables         map[string]apiextv1.JSON `json:"variables,omitempty"`
+	ValueSources      map[string]ValueFrom     `json:"valueSources,omitempty"`
+	Outputs           []OutputSpec             `json:"outputs,omitempty"`
+	ExecutionTemplate ExecutionTemplateSpec    `json:"executionTemplate,omitempty"`
+	AutoApply         bool                     `json:"autoApply,omitempty"`      // If true, applies changes automatically when drift is detected.
+	DriftDetection    *DriftDetectionSpec      `json:"driftDetection,omitempty"` // Optional drift detection configuration.
 }
 
 // TofuModuleStatus defines the observed state of a TofuModule.
 type TofuModuleStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	Phase              string             `json:"phase,omitempty"`              // High-level lifecycle phase
+	ObservedGeneration int64              `json:"observedGeneration,omitempty"` // For avoiding stale updates
+	LastPlan           *ExecutionSummary  `json:"lastPlan,omitempty"`           // Info from most recent plan
+	LastApply          *ExecutionSummary  `json:"lastApply,omitempty"`          // Info from most recent apply
+	Conditions         []metav1.Condition `json:"conditions,omitempty"`         // Standard K8s-style condition set
+	LastExecutionName  string             `json:"lastExecution,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -84,6 +108,8 @@ type TofuModuleStatus struct {
 // +kubebuilder:resource:shortName=tfmod
 // +kubebuilder:printcolumn:name="Source",type=string,JSONPath=`.spec.source`
 // +kubebuilder:printcolumn:name="Version",type=string,JSONPath=`.spec.version`
+// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="LastExecution",type=string,JSONPath=`.status.lastExecution`
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // TofuModule is the Schema for the tofumodules API.

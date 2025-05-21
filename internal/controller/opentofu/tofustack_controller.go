@@ -23,7 +23,6 @@ import (
 
 	opentofuv1alpha1 "github.com/soyplane-io/soyplane/api/opentofu/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,19 +59,22 @@ func (r *TofuStackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	lastExecution, err := r.lastExecution(ctx, &stack)
 	if err != nil {
+		log.Error(err, "Unable to fetch last TofuExecution")
 		return ctrl.Result{}, err
 	}
 
 	if lastExecution == nil {
 		execution, err := r.createExecution(ctx, &stack)
 		if err != nil {
+			log.Error(err, "Unable to create new TofuExecution")
 			return ctrl.Result{}, err
 		}
 
-		log.Info("TofuStack reconciled, Created TofuExecution for stack", "execution", execution.Name)
+		log.Info("TofuStack reconciled, Created TofuExecution", "execution", execution.Name)
 		return ctrl.Result{}, nil
 	}
 	if updated, err := r.updateStackStatus(ctx, &stack, lastExecution); err != nil {
+		log.Error(err, "Could not update TofuStack status")
 		return ctrl.Result{}, err
 	} else if updated {
 		log.Info("TofuStack reconciled, Status updated")
@@ -154,31 +156,10 @@ func (r *TofuStackReconciler) createExecution(ctx context.Context, stack *opento
 	return &exec, nil
 }
 
-var (
-	executionOwnerKey = ".metadata.controller"
-)
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *TofuStackReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(),
-		&opentofuv1alpha1.TofuExecution{},
-		executionOwnerKey,
-		func(rawObj client.Object) []string {
-			exec := rawObj.(*opentofuv1alpha1.TofuExecution)
-			owner := metav1.GetControllerOf(exec)
-			if owner == nil {
-				return nil
-			}
-			if owner.Kind != "TofuStack" {
-				return nil
-			}
-			return []string{owner.Name}
-		}); err != nil {
-		return err
-	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&opentofuv1alpha1.TofuStack{}).
-		Owns(&opentofuv1alpha1.TofuExecution{}).
 		Named("opentofu_tofustack").
 		Complete(r)
 }

@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -104,12 +105,40 @@ func (r *TofuExecutionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
+func (r *TofuExecutionReconciler) getModule(ctx context.Context, module *opentofuv1alpha1.TofuModule, name types.NamespacedName) error {
+	if err := r.Get(ctx, name, module); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (r *TofuExecutionReconciler) constructJobFromExecution(ctx context.Context, execution *opentofuv1alpha1.TofuExecution) (*batchv1.Job, error) {
 	jobName := execution.Name
+
 	if execution.Spec.JobTemplate.Metadata.GenerateName != "" {
 		jobName = execution.Spec.JobTemplate.Metadata.GenerateName
 	}
-
+	engine := execution.Spec.Engine
+	moduleName := types.NamespacedName{
+		Namespace: execution.Spec.ModuleRef.Namespace,
+		Name:      execution.Spec.ModuleRef.Name,
+	}
+	module := opentofuv1alpha1.TofuModule{}
+	if err := r.Get(ctx, moduleName, &module); err != nil {
+		return nil, err
+	}
+	var image string
+	if engine.Name == "terraform" {
+		image = "hashicorp/terraform:" + engine.Version
+	} else {
+		image = "ghcr.io/opentofu/opentofu:" + engine.Version
+	}
+	cmd := fmt.Sprintf(`mkdir workspace;
+	cd workspace;
+	git clone %s .;
+	cd %s;
+	%s init;
+	%s %s`, module.Spec.Source, module.Spec.Workdir, engine.Name, engine.Name, execution.Spec.Action)
 	newJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: jobName + "-",
@@ -128,13 +157,11 @@ func (r *TofuExecutionReconciler) constructJobFromExecution(ctx context.Context,
 					ServiceAccountName: execution.Spec.JobTemplate.ServiceAccountName,
 					Containers: []corev1.Container{
 						{
-							Name:  "simulate-tofu",
-							Image: "tofuutils/tenv:latest",
-							Command: []string{
-								"sh", "-c",
-								fmt.Sprintf("echo 'Simulating tofu %s'; sleep 15; echo 'Done'", execution.Spec.Action),
-							},
-							Env: execution.Spec.JobTemplate.Env,
+							Name:    "simulate-tofu",
+							Image:   image,
+							Command: []string{"sh", "-exc", cmd},
+							Env:     execution.Spec.JobTemplate.Env,
+							EnvFrom: execution.Spec.JobTemplate.EnvFrom,
 						},
 					},
 				},

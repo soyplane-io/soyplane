@@ -16,7 +16,7 @@ spec:
     spec:
       action: plan
       moduleRef:
-        name: dummy
+        name: null-module
         namespace: default
       jobTemplate:
         metadata:
