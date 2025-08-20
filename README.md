@@ -6,6 +6,7 @@
 
 **Plan, apply, and detect drift — declaratively.**
 
+NB: This project is still in early stage of development and will change considerably, any feature requests, comments, or suggestions are very welcome
 ---
 
 ## ✨ Features

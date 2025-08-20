@@ -20,7 +20,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 .PHONY: all
-all: build
+all: build build-agent
 
 ##@ General
 
@@ -93,11 +93,11 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+	go build -o bin/manager cmd/manager/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	POD_NAMESPACE=default go run ./cmd/main.go
+	POD_NAMESPACE=default go run ./cmd/manager/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
@@ -223,3 +223,13 @@ mv $(1) $(1)-$(3) ;\
 } ;\
 ln -sf $(1)-$(3) $(1)
 endef
+
+# This section is dedicated to the Soyplane agent.
+.PHONY: build-agent
+build-agent: manifests generate fmt vet ## Build agent binary.
+	go build -o bin/agent cmd/agent/main.go
+
+.PHONY: run-agent
+run-agent: manifests generate fmt vet ## Run a controller from your host.
+	TOFU_EXECUTION_NAME=null-module-84f2n TOFU_EXECUTION_NAMESPACE=default go run ./cmd/agent/main.go
+
