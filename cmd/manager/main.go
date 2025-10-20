@@ -17,14 +17,15 @@ limitations under the License.
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	corev1 "k8s.io/api/core/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,6 +67,8 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
+	var configFiles []string
+	var watchConfig bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -83,6 +86,15 @@ func main() {
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.Func("configs", "List of config files (comma-separated and/or repeated)", func(v string) error {
+		for _, part := range strings.Split(v, ",") {
+			if f := strings.TrimSpace(part); f != "" {
+				configFiles = append(configFiles, f)
+			}
+		}
+		return nil
+	})
+	flag.BoolVar(&watchConfig, "watch-config", true, "Watch config files and auto-reload on changes")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -204,25 +216,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	podNamespace := os.Getenv("POD_NAMESPACE")
-	if podNamespace == "" {
-		setupLog.Error(nil, "POD_NAMESPACE environment variable not set")
+	// Initialize application settings from local config files.
+	if err := settings.Init(configFiles, watchConfig); err != nil {
+		setupLog.Error(err, "failed to initialize settings")
 		os.Exit(1)
-	}
-	settingsWatcher := settings.SettingsWatcher{
-		Client:    mgr.GetClient(),
-		Namespace: podNamespace,
 	}
 
-	if err = settingsWatcher.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "SettingsWatcher")
-		os.Exit(1)
+	var eventRef *corev1.ObjectReference
+	if podName := os.Getenv("POD_NAME"); podName != "" {
+		eventRef = &corev1.ObjectReference{
+			APIVersion: "v1",
+			Kind:       "Pod",
+			Name:       podName,
+			Namespace:  os.Getenv("POD_NAMESPACE"),
+		}
 	}
-	reader := mgr.GetAPIReader()
-	if err := settingsWatcher.Load(context.Background(), &reader); err != nil {
-		setupLog.Error(err, "failed to load initial settings")
-		os.Exit(1)
-	}
+	settings.ConfigureEvents(mgr.GetEventRecorderFor("settings"), eventRef)
 	if err = (&opentofucontroller.TofuExecutionReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),

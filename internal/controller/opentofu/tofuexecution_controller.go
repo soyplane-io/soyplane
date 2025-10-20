@@ -31,6 +31,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	opentofuv1alpha1 "github.com/soyplane-io/soyplane/api/opentofu/v1alpha1"
+	settings "github.com/soyplane-io/soyplane/internal/settings"
 )
 
 // TofuExecutionReconciler reconciles a TofuExecution object
@@ -119,6 +120,11 @@ func (r *TofuExecutionReconciler) constructJobFromExecution(ctx context.Context,
 		jobName = execution.Spec.JobTemplate.Metadata.GenerateName
 	}
 	engine := execution.Spec.Engine
+	engineName := engine.Name
+	if engineName == "" {
+		engineName = "tofu"
+	}
+
 	moduleName := types.NamespacedName{
 		Namespace: execution.Spec.ModuleRef.Namespace,
 		Name:      execution.Spec.ModuleRef.Name,
@@ -127,18 +133,31 @@ func (r *TofuExecutionReconciler) constructJobFromExecution(ctx context.Context,
 	if err := r.Get(ctx, moduleName, &module); err != nil {
 		return nil, err
 	}
-	var image string
-	if engine.Name == "terraform" {
-		image = "hashicorp/terraform:" + engine.Version
-	} else {
-		image = "ghcr.io/opentofu/opentofu:" + engine.Version
+	execCfg, err := settings.Execution()
+	if err != nil {
+		return nil, fmt.Errorf("invalid settings: %w", err)
+	}
+	image := execCfg.DefaultImage
+	switch engineName {
+	case "terraform":
+		if engine.Version != "" {
+			image = "hashicorp/terraform:" + engine.Version
+		}
+	case "tofu":
+		if engine.Version != "" {
+			image = "ghcr.io/opentofu/opentofu:" + engine.Version
+		}
+	default:
+		if engine.Version != "" {
+			image = fmt.Sprintf("%s:%s", engineName, engine.Version)
+		}
 	}
 	cmd := fmt.Sprintf(`mkdir workspace;
 	cd workspace;
 	git clone %s .;
 	cd %s;
 	%s init;
-	%s %s`, module.Spec.Source, module.Spec.Workdir, engine.Name, engine.Name, execution.Spec.Action)
+	%s %s`, module.Spec.Source, module.Spec.Workdir, engineName, engineName, execution.Spec.Action)
 	newJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: jobName + "-",

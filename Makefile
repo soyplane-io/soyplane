@@ -97,7 +97,7 @@ build: manifests generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	POD_NAMESPACE=default go run ./cmd/manager/main.go
+	POD_NAMESPACE=default POD_NAME=soyplane-operator go run ./cmd/manager/main.go --metrics-bind-address localhost:8080 --metrics-secure=false
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
