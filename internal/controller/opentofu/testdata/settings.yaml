@@ -1,0 +1,3 @@
+execution:
+  defaultImage: tofuutils/tenv:latest
+test: true
