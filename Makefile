@@ -156,6 +156,20 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
+# TODO: remove the prototype helpers once a dedicated CLI/docs flow replaces them.
+.PHONY: prototype-plan
+prototype-plan: manifests generate fmt vet ## Deploy controller and apply plan-only samples.
+	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
+	$(KUBECTL) apply -f config/samples/opentofu_v1alpha1_tofumodule.yaml
+	$(KUBECTL) apply -f config/samples/opentofu_v1alpha1_tofustack.yaml
+	@echo "Prototype applied. Monitor executions with: kubectl get tofuexecutions -n default"
+
+.PHONY: prototype-clean
+prototype-clean: ## Remove prototype samples and undeploy controller.
+	$(KUBECTL) delete --ignore-not-found -f config/samples/opentofu_v1alpha1_tofustack.yaml
+	$(KUBECTL) delete --ignore-not-found -f config/samples/opentofu_v1alpha1_tofumodule.yaml
+	$(MAKE) undeploy
+
 ##@ Dependencies
 
 ## Location to install dependencies to
@@ -232,4 +246,3 @@ build-agent: manifests generate fmt vet ## Build agent binary.
 .PHONY: run-agent
 run-agent: manifests generate fmt vet ## Run a controller from your host.
 	TOFU_EXECUTION_NAME=null-module-84f2n TOFU_EXECUTION_NAMESPACE=default go run ./cmd/agent/main.go
-

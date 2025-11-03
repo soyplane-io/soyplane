@@ -19,7 +19,9 @@ package opentofu
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
+	"strconv"
 
 	opentofuv1alpha1 "github.com/soyplane-io/soyplane/api/opentofu/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -64,16 +66,32 @@ func (r *TofuModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
+	desiredGeneration := strconv.FormatInt(module.GetGeneration(), 10)
+
 	if lastExecution == nil {
-		execution, err := r.createExecution(ctx, &module)
+		newExecution, err := r.createExecution(ctx, &module)
 		if err != nil {
 			log.Error(err, "Unable to create new TofuExecution")
 			return ctrl.Result{}, err
 		}
 
-		log.Info("TofuModule reconciled, Created TofuExecution", "execution", execution.Name)
+		log.Info("TofuModule reconciled, Created TofuExecution", "execution", newExecution.Name)
 		return ctrl.Result{}, nil
 	}
+	currentGeneration := ""
+	if lastExecution.Annotations != nil {
+		currentGeneration = lastExecution.Annotations[moduleGenerationAnnotation]
+	}
+	if currentGeneration != desiredGeneration && isExecutionTerminal(lastExecution.Status.Phase) {
+		newExecution, err := r.createExecution(ctx, &module)
+		if err != nil {
+			log.Error(err, "Unable to create new TofuExecution for updated module spec")
+			return ctrl.Result{}, err
+		}
+		log.Info("Module spec changed — triggered new TofuExecution", "execution", newExecution.Name, "generation", desiredGeneration)
+		return ctrl.Result{}, nil
+	}
+
 	if updated, err := r.updateModuleStatus(ctx, &module, lastExecution); err != nil {
 		log.Error(err, "Could not update TofuModule status")
 		return ctrl.Result{}, err
@@ -116,20 +134,27 @@ func (r *TofuModuleReconciler) updateModuleStatus(ctx context.Context, module *o
 func (r *TofuModuleReconciler) lastExecution(ctx context.Context, module *opentofuv1alpha1.TofuModule) (*opentofuv1alpha1.TofuExecution, error) {
 	log := logf.FromContext(ctx)
 	var childExecutions opentofuv1alpha1.TofuExecutionList
-	if err := r.List(ctx, &childExecutions, client.InNamespace(module.Namespace), client.MatchingFields{executionOwnerKey: module.Name}); err != nil {
+	if err := r.List(ctx, &childExecutions, client.InNamespace(module.Namespace)); err != nil {
 		log.Error(err, "unable to list child executions")
 		return nil, err
 	}
-	if len(childExecutions.Items) == 0 {
+	ownedExecutions := make([]*opentofuv1alpha1.TofuExecution, 0, len(childExecutions.Items))
+	for i := range childExecutions.Items {
+		exec := &childExecutions.Items[i]
+		if metav1.IsControlledBy(exec, module) {
+			ownedExecutions = append(ownedExecutions, exec)
+		}
+	}
+	if len(ownedExecutions) == 0 {
 		return nil, nil
 	}
 
 	// Sort newest first
-	sort.SliceStable(childExecutions.Items, func(i, j int) bool {
-		return childExecutions.Items[i].CreationTimestamp.Time.After(childExecutions.Items[j].CreationTimestamp.Time)
+	sort.SliceStable(ownedExecutions, func(i, j int) bool {
+		return ownedExecutions[i].CreationTimestamp.Time.After(ownedExecutions[j].CreationTimestamp.Time)
 	})
 
-	return &childExecutions.Items[0], nil // Latest execution
+	return ownedExecutions[0], nil // Latest execution
 }
 
 func (r *TofuModuleReconciler) createExecution(ctx context.Context, module *opentofuv1alpha1.TofuModule) (*opentofuv1alpha1.TofuExecution, error) {
@@ -142,9 +167,19 @@ func (r *TofuModuleReconciler) createExecution(ctx context.Context, module *open
 	}
 	exec.GenerateName = generateName
 	exec.Namespace = module.Namespace
-	exec.Labels = map[string]string{
-		"opentofu.soyplane.io/module": module.Name,
+
+	exec.Labels = maps.Clone(module.Spec.ExecutionTemplate.Metadata.Labels)
+	if exec.Labels == nil {
+		exec.Labels = make(map[string]string)
 	}
+
+	exec.Annotations = maps.Clone(module.Spec.ExecutionTemplate.Metadata.Annotations)
+	if exec.Annotations == nil {
+		exec.Annotations = make(map[string]string)
+	}
+	// TODO: consider moving the parent generation marker into execution status once we
+	// have a richer status contract and the reconciler owns status updates.
+	exec.Annotations[moduleGenerationAnnotation] = strconv.FormatInt(module.GetGeneration(), 10)
 
 	exec.Spec.ModuleRef.Name = module.Name
 	exec.Spec.ModuleRef.Namespace = module.Namespace
@@ -160,28 +195,8 @@ func (r *TofuModuleReconciler) createExecution(ctx context.Context, module *open
 	return &exec, nil
 }
 
-var (
-	executionOwnerKey = ".metadata.controller"
-)
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *TofuModuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(),
-		&opentofuv1alpha1.TofuExecution{},
-		executionOwnerKey,
-		func(rawObj client.Object) []string {
-			exec := rawObj.(*opentofuv1alpha1.TofuExecution)
-			owner := metav1.GetControllerOf(exec)
-			if owner == nil {
-				return nil
-			}
-			if owner.Kind != "TofuModule" {
-				return nil
-			}
-			return []string{owner.Name}
-		}); err != nil {
-		return err
-	}
 	return ctrl.NewControllerManagedBy(mgr).
 		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
 		// For().

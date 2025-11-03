@@ -19,10 +19,13 @@ package opentofu
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,6 +46,8 @@ type TofuExecutionReconciler struct {
 // +kubebuilder:rbac:groups=opentofu.soyplane.io,resources=tofuexecutions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=opentofu.soyplane.io,resources=tofuexecutions/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=opentofu.soyplane.io,resources=tofuexecutions/finalizers,verbs=update
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -92,16 +97,64 @@ func (r *TofuExecutionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	} else {
 		phase = "Pending"
 	}
-	if execution.Status.Phase == phase {
-		log.Info("TofuExecution reconciled, nothing to do")
-		return ctrl.Result{}, nil
+
+	summaryChanged := false
+	if execution.Status.ExecutionSummary.JobName != job.Name {
+		execution.Status.ExecutionSummary.JobName = job.Name
+		summaryChanged = true
 	}
 
-	execution.Status.Phase = phase
-	if err := r.Status().Update(ctx, &execution); err != nil {
-		return ctrl.Result{}, err
+	if job.Status.StartTime != nil {
+		if execution.Status.ExecutionSummary.StartedAt == nil ||
+			!execution.Status.ExecutionSummary.StartedAt.Equal(job.Status.StartTime) {
+			execution.Status.ExecutionSummary.StartedAt = job.Status.StartTime.DeepCopy()
+			summaryChanged = true
+		}
 	}
-	log.Info("TofuExecution reconciled")
+
+	if job.Status.CompletionTime != nil {
+		if execution.Status.ExecutionSummary.FinishedAt == nil ||
+			!execution.Status.ExecutionSummary.FinishedAt.Equal(job.Status.CompletionTime) {
+			execution.Status.ExecutionSummary.FinishedAt = job.Status.CompletionTime.DeepCopy()
+			summaryChanged = true
+		}
+	}
+
+	var summaryMsg string
+	switch phase {
+	case "Succeeded":
+		summaryMsg = "Plan completed successfully"
+	case "Failed":
+		summaryMsg = "Plan failed"
+	case "Running":
+		summaryMsg = "Plan is running"
+	default:
+		summaryMsg = "Plan pending"
+	}
+
+	if execution.Status.ExecutionSummary.Summary != summaryMsg {
+		execution.Status.ExecutionSummary.Summary = summaryMsg
+		summaryChanged = true
+	}
+
+	statusChanged := summaryChanged
+	if execution.Status.Phase != phase {
+		execution.Status.Phase = phase
+		statusChanged = true
+	}
+
+	if statusChanged {
+		if err := r.Status().Update(ctx, &execution); err != nil {
+			return ctrl.Result{}, err
+		}
+		log.Info("TofuExecution status updated", "phase", phase, "job", job.Name)
+	} else {
+		log.Info("TofuExecution reconciled, nothing to update", "phase", phase, "job", job.Name)
+	}
+
+	if phase == "Running" || phase == "Pending" {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -133,6 +186,10 @@ func (r *TofuExecutionReconciler) constructJobFromExecution(ctx context.Context,
 	if err := r.Get(ctx, moduleName, &module); err != nil {
 		return nil, err
 	}
+	workdir := module.Spec.Workdir
+	if workdir == "" {
+		workdir = "."
+	}
 	execCfg, err := settings.Execution()
 	if err != nil {
 		return nil, fmt.Errorf("invalid settings: %w", err)
@@ -157,19 +214,41 @@ func (r *TofuExecutionReconciler) constructJobFromExecution(ctx context.Context,
 	git clone %s .;
 	cd %s;
 	%s init;
-	%s %s`, module.Spec.Source, module.Spec.Workdir, engineName, engineName, execution.Spec.Action)
+	%s %s`, module.Spec.Source, workdir, engineName, engineName, execution.Spec.Action)
+	// TODO: replace the inline shell script with the dedicated agent binary once the agent pipeline
+	// is implemented (will handle variables, state backends, and richer status reporting).
+	jobLabels := maps.Clone(execution.Spec.JobTemplate.Metadata.Labels)
+	if jobLabels == nil {
+		jobLabels = make(map[string]string)
+	}
+
+	jobAnnotations := maps.Clone(execution.Spec.JobTemplate.Metadata.Annotations)
+	if jobAnnotations == nil {
+		jobAnnotations = make(map[string]string)
+	}
+
+	podLabels := maps.Clone(execution.Spec.JobTemplate.Metadata.Labels)
+	if podLabels == nil {
+		podLabels = make(map[string]string)
+	}
+
+	podAnnotations := maps.Clone(execution.Spec.JobTemplate.Metadata.Annotations)
+	if podAnnotations == nil {
+		podAnnotations = make(map[string]string)
+	}
+
 	newJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: jobName + "-",
 			Namespace:    execution.Namespace,
-			Labels:       execution.Spec.JobTemplate.Metadata.Labels,
-			Annotations:  execution.Spec.JobTemplate.Metadata.Annotations,
+			Labels:       jobLabels,
+			Annotations:  jobAnnotations,
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      execution.Spec.JobTemplate.Metadata.Labels,
-					Annotations: execution.Spec.JobTemplate.Metadata.Annotations,
+					Labels:      podLabels,
+					Annotations: podAnnotations,
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyNever,
@@ -198,47 +277,40 @@ func (r *TofuExecutionReconciler) constructJobFromExecution(ctx context.Context,
 func (r *TofuExecutionReconciler) job(ctx context.Context, execution *opentofuv1alpha1.TofuExecution) (*batchv1.Job, error) {
 	log := logf.FromContext(ctx)
 	var childJobs batchv1.JobList
-	if err := r.List(ctx, &childJobs, client.InNamespace(execution.Namespace), client.MatchingFields{jobOwnerKey: execution.Name}); err != nil {
+	if err := r.List(ctx, &childJobs, client.InNamespace(execution.Namespace)); err != nil {
 		log.Error(err, "unable to list child job")
 		return nil, err
 	}
-	switch len(childJobs.Items) {
+	ownedJobs := make([]*batchv1.Job, 0, len(childJobs.Items))
+	for i := range childJobs.Items {
+		job := &childJobs.Items[i]
+		if metav1.IsControlledBy(job, execution) {
+			ownedJobs = append(ownedJobs, job)
+		}
+	}
+	switch len(ownedJobs) {
 	case 0:
 		return nil, nil
 	case 1:
-		return &childJobs.Items[0], nil
+		return ownedJobs[0], nil
 	default:
-		log.Error(nil, "More than one Job owned by the same execution", "Execution", execution.Name)
 		// Sort newest first
-		sort.SliceStable(childJobs.Items, func(i, j int) bool {
-			return childJobs.Items[i].CreationTimestamp.Time.After(childJobs.Items[j].CreationTimestamp.Time)
+		sort.SliceStable(ownedJobs, func(i, j int) bool {
+			return ownedJobs[i].CreationTimestamp.Time.After(ownedJobs[j].CreationTimestamp.Time)
 		})
-		return &childJobs.Items[0], nil // Latest execution
+		latest := ownedJobs[0]
+		log.Info("Multiple Jobs owned by execution; keeping the newest and deleting stale ones", "execution", execution.Name, "activeJob", latest.Name, "staleCount", len(ownedJobs)-1)
+		for _, stale := range ownedJobs[1:] {
+			if err := r.Delete(ctx, stale); err != nil && !k8serrors.IsNotFound(err) {
+				log.Error(err, "Failed to delete stale Job", "job", stale.Name)
+			}
+		}
+		return latest, nil
 	}
 }
 
-var (
-	jobOwnerKey = ".metadata.controller"
-)
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *TofuExecutionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(),
-		&batchv1.Job{},
-		jobOwnerKey,
-		func(rawObj client.Object) []string {
-			job := rawObj.(*batchv1.Job)
-			owner := metav1.GetControllerOf(job)
-			if owner == nil {
-				return nil
-			}
-			if owner.Kind != "TofuExecution" {
-				return nil
-			}
-			return []string{owner.Name}
-		}); err != nil {
-		return err
-	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&opentofuv1alpha1.TofuExecution{}).
 		Owns(&batchv1.Job{}).

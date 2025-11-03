@@ -19,10 +19,13 @@ package opentofu
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
+	"strconv"
 
 	opentofuv1alpha1 "github.com/soyplane-io/soyplane/api/opentofu/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,16 +66,32 @@ func (r *TofuStackReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
+	desiredGeneration := strconv.FormatInt(stack.GetGeneration(), 10)
+
 	if lastExecution == nil {
-		execution, err := r.createExecution(ctx, &stack)
+		newExecution, err := r.createExecution(ctx, &stack)
 		if err != nil {
 			log.Error(err, "Unable to create new TofuExecution")
 			return ctrl.Result{}, err
 		}
 
-		log.Info("TofuStack reconciled, Created TofuExecution", "execution", execution.Name)
+		log.Info("TofuStack reconciled, Created TofuExecution", "execution", newExecution.Name)
 		return ctrl.Result{}, nil
 	}
+	currentGeneration := ""
+	if lastExecution.Annotations != nil {
+		currentGeneration = lastExecution.Annotations[stackGenerationAnnotation]
+	}
+	if currentGeneration != desiredGeneration && isExecutionTerminal(lastExecution.Status.Phase) {
+		newExecution, err := r.createExecution(ctx, &stack)
+		if err != nil {
+			log.Error(err, "Unable to create new TofuExecution for updated stack spec")
+			return ctrl.Result{}, err
+		}
+		log.Info("Stack spec changed — triggered new TofuExecution", "execution", newExecution.Name, "generation", desiredGeneration)
+		return ctrl.Result{}, nil
+	}
+
 	if updated, err := r.updateStackStatus(ctx, &stack, lastExecution); err != nil {
 		log.Error(err, "Could not update TofuStack status")
 		return ctrl.Result{}, err
@@ -115,20 +134,27 @@ func (r *TofuStackReconciler) updateStackStatus(ctx context.Context, stack *open
 func (r *TofuStackReconciler) lastExecution(ctx context.Context, stack *opentofuv1alpha1.TofuStack) (*opentofuv1alpha1.TofuExecution, error) {
 	log := logf.FromContext(ctx)
 	var childExecutions opentofuv1alpha1.TofuExecutionList
-	if err := r.List(ctx, &childExecutions, client.InNamespace(stack.Namespace), client.MatchingFields{executionOwnerKey: stack.Name}); err != nil {
+	if err := r.List(ctx, &childExecutions, client.InNamespace(stack.Namespace)); err != nil {
 		log.Error(err, "unable to list child executions")
 		return nil, err
 	}
-	if len(childExecutions.Items) == 0 {
+	ownedExecutions := make([]*opentofuv1alpha1.TofuExecution, 0, len(childExecutions.Items))
+	for i := range childExecutions.Items {
+		exec := &childExecutions.Items[i]
+		if metav1.IsControlledBy(exec, stack) {
+			ownedExecutions = append(ownedExecutions, exec)
+		}
+	}
+	if len(ownedExecutions) == 0 {
 		return nil, nil
 	}
 
 	// Sort newest first
-	sort.SliceStable(childExecutions.Items, func(i, j int) bool {
-		return childExecutions.Items[i].CreationTimestamp.Time.After(childExecutions.Items[j].CreationTimestamp.Time)
+	sort.SliceStable(ownedExecutions, func(i, j int) bool {
+		return ownedExecutions[i].CreationTimestamp.Time.After(ownedExecutions[j].CreationTimestamp.Time)
 	})
 
-	return &childExecutions.Items[0], nil // Latest execution
+	return ownedExecutions[0], nil // Latest execution
 }
 
 func (r *TofuStackReconciler) createExecution(ctx context.Context, stack *opentofuv1alpha1.TofuStack) (*opentofuv1alpha1.TofuExecution, error) {
@@ -141,8 +167,19 @@ func (r *TofuStackReconciler) createExecution(ctx context.Context, stack *opento
 	}
 	exec.GenerateName = generateName
 	exec.Namespace = stack.Namespace
-	exec.Labels = map[string]string{
-		"opentofu.soyplane.io/stack": stack.Name,
+
+	exec.Labels = maps.Clone(stack.Spec.ExecutionTemplate.Metadata.Labels)
+	exec.Annotations = maps.Clone(stack.Spec.ExecutionTemplate.Metadata.Annotations)
+	if exec.Annotations == nil {
+		exec.Annotations = make(map[string]string)
+	}
+	// TODO: consider publishing the parent generation via execution status once we
+	// formalize the status schema and own updates end-to-end.
+	exec.Annotations[stackGenerationAnnotation] = strconv.FormatInt(stack.GetGeneration(), 10)
+
+	exec.Spec.ModuleRef = stack.Spec.ModuleRef
+	if exec.Spec.ModuleRef.Namespace == "" {
+		exec.Spec.ModuleRef.Namespace = stack.Namespace
 	}
 
 	if err := ctrl.SetControllerReference(stack, &exec, r.Scheme); err != nil {
@@ -160,6 +197,7 @@ func (r *TofuStackReconciler) createExecution(ctx context.Context, stack *opento
 func (r *TofuStackReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&opentofuv1alpha1.TofuStack{}).
+		Owns(&opentofuv1alpha1.TofuExecution{}).
 		Named("opentofu_tofustack").
 		Complete(r)
 }

@@ -15,3 +15,17 @@ limitations under the License.
 */
 
 package opentofu
+
+const (
+	moduleGenerationAnnotation = "opentofu.soyplane.io/module-generation"
+	stackGenerationAnnotation  = "opentofu.soyplane.io/stack-generation"
+)
+
+func isExecutionTerminal(phase string) bool {
+	switch phase {
+	case "Succeeded", "Failed":
+		return true
+	default:
+		return false
+	}
+}

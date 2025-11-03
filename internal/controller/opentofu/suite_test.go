@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	opentofuv1alpha1 "github.com/soyplane-io/soyplane/api/opentofu/v1alpha1"
+	settings "github.com/soyplane-io/soyplane/internal/settings"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -61,6 +62,9 @@ var _ = BeforeSuite(func() {
 	var err error
 	err = opentofuv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+
+	settings.DefaultConfigPaths = []string{"testdata/settings.yaml"}
+	Expect(settings.Init(nil, false)).To(Succeed())
 
 	// +kubebuilder:scaffold:scheme
 

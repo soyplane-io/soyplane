@@ -6,30 +6,14 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: null-module
 spec:
-  # TODO(user): Add fields here
-  source: https://$gitToken@github.com/soyplane-io/sample-tofu-modules.git
+  source: https://github.com/soyplane-io/sample-tofu-modules.git
   workdir: null-module
-  variables:
-    name: test123
-  autoApply: false
   executionTemplate:
     metadata:
       labels:
-        purpose: demo
+        soyplane.io/purpose: prototype
     spec:
       action: plan
-      engine:
-        name: terraform
       moduleRef:
         name: null-module
         namespace: default
-      jobTemplate:
-        metadata:
-          labels:
-            test: test1
-        envFrom:
-          - secretRef:
-              name: git-creds
-        env:
-          - name: TF_LOG
-            value: DEBUG

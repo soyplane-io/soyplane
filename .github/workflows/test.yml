@@ -6,10 +6,14 @@ on:
 
 jobs:
   test:
-    name: Run on Ubuntu
+    name: Build, Test, and Publish Image
     runs-on: ubuntu-latest
+    env:
+      GOCACHE: ${{ github.workspace }}/.cache/go-build
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
     steps:
-      - name: Clone the code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Go
@@ -17,7 +21,40 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Running Tests
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.GOCACHE }}
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build
+        run: make build
+
+      - name: Test
+        run: make test
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push controller image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          IMG: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/controller:${{ github.sha }}
         run: |
-          go mod tidy
-          make test
+          make docker-build IMG=$IMG
+          make docker-push IMG=$IMG

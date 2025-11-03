@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,19 +42,63 @@ var _ = Describe("TofuStack Controller", func() {
 			Namespace: "default", // TODO(user):Modify as needed
 		}
 		tofustack := &opentofuv1alpha1.TofuStack{}
+		moduleNamespacedName := types.NamespacedName{
+			Name:      "test-module",
+			Namespace: "default",
+		}
 
 		BeforeEach(func() {
+			By("ensuring the referenced TofuModule exists")
+			module := &opentofuv1alpha1.TofuModule{}
+			err := k8sClient.Get(ctx, moduleNamespacedName, module)
+			if err != nil && errors.IsNotFound(err) {
+				module = &opentofuv1alpha1.TofuModule{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      moduleNamespacedName.Name,
+						Namespace: moduleNamespacedName.Namespace,
+					},
+					Spec: opentofuv1alpha1.TofuModuleSpec{
+						Source: "https://example.com/repo.git",
+						ExecutionTemplate: opentofuv1alpha1.ExecutionTemplateSpec{
+							Spec: opentofuv1alpha1.TofuExecutionSpec{
+								Action: "plan",
+								ModuleRef: opentofuv1alpha1.ObjectRef{
+									Name:      moduleNamespacedName.Name,
+									Namespace: moduleNamespacedName.Namespace,
+								},
+							},
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, module)).To(Succeed())
+			} else {
+				Expect(err).NotTo(HaveOccurred())
+			}
+
 			By("creating the custom resource for the Kind TofuStack")
-			err := k8sClient.Get(ctx, typeNamespacedName, tofustack)
+			err = k8sClient.Get(ctx, typeNamespacedName, tofustack)
 			if err != nil && errors.IsNotFound(err) {
 				resource := &opentofuv1alpha1.TofuStack{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
 					},
+					Spec: opentofuv1alpha1.TofuStackSpec{
+						ExecutionTemplate: opentofuv1alpha1.ExecutionTemplateSpec{
+							Spec: opentofuv1alpha1.TofuExecutionSpec{
+								Action: "plan",
+								ModuleRef: opentofuv1alpha1.ObjectRef{
+									Name:      moduleNamespacedName.Name,
+									Namespace: moduleNamespacedName.Namespace,
+								},
+							},
+						},
+					},
 					// TODO(user): Specify other spec details if needed.
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			} else {
+				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
@@ -65,6 +110,25 @@ var _ = Describe("TofuStack Controller", func() {
 
 			By("Cleanup the specific resource instance TofuStack")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+
+			module := &opentofuv1alpha1.TofuModule{}
+			err = k8sClient.Get(ctx, moduleNamespacedName, module)
+			if err == nil {
+				By("Cleaning up the referenced TofuModule")
+				Expect(k8sClient.Delete(ctx, module)).To(Succeed())
+			} else {
+				Expect(errors.IsNotFound(err)).To(BeTrue())
+			}
+
+			var executions opentofuv1alpha1.TofuExecutionList
+			err = k8sClient.List(ctx, &executions, client.InNamespace("default"))
+			Expect(err).NotTo(HaveOccurred())
+			for i := range executions.Items {
+				exec := &executions.Items[i]
+				if metav1.IsControlledBy(exec, resource) {
+					Expect(k8sClient.Delete(ctx, exec)).To(Succeed())
+				}
+			}
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")

@@ -7,22 +7,14 @@ metadata:
   name: tofustack-sample
 spec:
   moduleTemplate:
-    name: dummy
+    name: null-module
     namespace: default
   executionTemplate:
     metadata:
       labels:
-        purpose: demo
+        soyplane.io/purpose: prototype
     spec:
       action: plan
       moduleRef:
         name: null-module
         namespace: default
-      jobTemplate:
-        metadata:
-          labels:
-            test: test1
-        env:
-          - name: TF_LOG
-            value: DEBUG
-  autoApply: false
